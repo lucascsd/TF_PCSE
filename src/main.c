@@ -7,6 +7,7 @@
 /*=====[Inclusions of function dependencies]=================================*/
 
 #include "sapi_max30102.h"
+#include "max30102_CIAA_port.h"
 
 #include "sapi.h"
 
@@ -22,8 +23,10 @@
 
 int main( void )
 {
-   /* ------------- INICIALIZACIONES ------------- */
 
+	max30102_t driver_max30102;
+
+	/* ------------- INICIALIZACIONES ------------- */
    boardConfig();
 
    // Inicializar la IMU
@@ -38,7 +41,6 @@ int main( void )
       printf( "    GND ---- GND\r\n" );
       printf( "    SCL ---- SCL\r\n" );
       printf( "    SDA ---- SDA\r\n" );
-      printf( "    AD0 ---- GND\r\n\r\n" );
       printf( "Se detiene el programa.\r\n" );
       while(1);
    }
@@ -46,8 +48,10 @@ int main( void )
 
    // ----- Repeat for ever -------------------------
    while( true ) {
-      gpioToggle(LED);
-      delay(500);
+	   /* Lectura de los leds IR y RED del modulo */
+	   readNewValue();
+	   clearFIFO(); //Reset the FIFO before we begin checking the sensor
+	   delay(1000);
    }
 
    // YOU NEVER REACH HERE, because this program runs directly or on a
