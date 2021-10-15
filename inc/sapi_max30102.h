@@ -13,6 +13,7 @@
  */
 
 #include "sapi.h"
+#include "math.h"
 
 /* REGISTER MAPS */
 
@@ -119,10 +120,6 @@
 #define MAX30102_I2C_RATE_STD	100000 // 400 kHz
 #define MAX30102_I2C_RATE_MAX	400000 // 400 kHz
 
-#define MAX30102_BUFFER_LENGTH 			32
-#define	MAX_SAMPLE						192
-#define STORAGE_SIZE					3
-
 #define	MAX_ADDRESS				((uint8_t)0x57)
 
 /* typedef for struct */
@@ -137,13 +134,24 @@ typedef uint8_t srMode_t;
 typedef uint8_t pwMode_t;
 typedef uint8_t registerLed_t;
 
+typedef bool_t (*i2c_port_t)(i2cMap_t, uint32_t);
+typedef bool_t (*i2c_write_t)( i2cMap_t  i2cNumber, uint8_t  i2cSlaveAddress, uint8_t registerAddr, uint8_t data );
+typedef bool_t (*i2c_Read_t)( i2cMap_t  i2cNumber, uint8_t  i2cSlaveAddress, uint8_t registerAddr, uint8_t* receiveDataBuffer, uint16_t receiveDataBufferSize );
+typedef void (*delayFnc_t)(uint32_t);
+
 typedef struct
 {
-	/* Direccion del dispositivo R/W */
-	slave_address_t _address;
 
-	registerAddr_t	registerAddress;
+	i2c_port_t		_i2cPortFn;
+	i2c_write_t		_i2cWriteFn;
+	i2c_Read_t		_i2cReadFn;
+	delayFnc_t		_delay;
 
+} max30102_t;
+
+
+typedef struct{
+	/* Tipos de datos para configuracion */
 	avgsamples_t	_avg;
 	rollOver_t		_rollOver;
 	pwMode_t 		_pW;
@@ -152,60 +160,42 @@ typedef struct
 	ledMode_t 		_ledC;
 	registerLed_t	_regLed;
 
-	/* buffer para lectura */
+	uint32_t 		datoLeidoRed[32];
+	uint32_t 		datoLeidoIr[32];
+	int32_t 		numberSamplesAvailable;
+	/* buffer para lectura y escritura de registros */
 	uint8_t 		_buffer;
 
-	/* buffer para datos de LED RED e IR */
-	uint32_t 		red[MAX30102_BUFFER_LENGTH];
-	uint32_t 		IR[MAX30102_BUFFER_LENGTH];
-	uint8_t 		redIR[MAX_SAMPLE];
+}max30102_config_t;
 
-	/* Usar almacenar por separados los datos */
-	uint8_t 		head;
-	uint8_t 		tail;
-
-	uint8_t			_dataQty;
-
-	uint8_t 		_PartID;
-	uint8_t			_RevisionID;
-
-} max30102_t;
+/* Variables del tipo tick para retardos */
+delay_t 	beatTime;
+uint16_t 	countBeat;
+float_t 	BPM;
 
 /* Mis funciones */
-void initStructMax30102();
+void 	initStructMax30102( void );
 
 /* Inicializar device */
-bool_t max30102Init();
-
-/* Funciones de lectura y escritura */
-uint8_t max30102Write ( uint8_t registerAddr, uint8_t data );
-bool_t max30102Read ( uint8_t registerAddr, uint8_t _dataQty );
+bool_t	max30102_Init( max30102_t driver_config );
+bool_t  max30102_setup ( max30102_config_t _configDevice );
+bool_t	max30102_config ( uint8_t _register, uint8_t _param, uint8_t shitf );
+bool_t 	max30102_reset 	( void );
 
 /* Lectura de Part ID y Revision ID */
-bool_t readPartID ( void );
-bool_t readRevisionID ( void );
+uint8_t max30102_readPartID 		( void );
+uint8_t max30102_readRevisionID 	( void );
 
-bool_t max30102_setup ( void );
-bool_t max30102_reset ( void );
-bool_t setSmpAvgFIFO (uint8_t avgsamples);
-bool_t rollOver ( uint8_t _rollOver );
-bool_t ledMode ( uint8_t _ledMode );
-bool_t spo2Config ( uint8_t _sop2Mode );
-bool_t sampleRate ( uint8_t _srMode );
-bool_t pulseWidth ( uint8_t _pwMode );
-bool_t pulseAmplitude ( uint8_t _ledMode, uint8_t _registerLed );
-bool_t ledConfig ( uint8_t _ledMode, uint8_t _registerLed, uint8_t shitf );
-bool_t clearFIFO ( void );
-bool_t readNewValue ( void );
-int16_t check ( void );
-uint8_t getWritePointer ( void );
-uint8_t getReadPointer ( void );
+bool_t 	max30102_clearFIFO 			( void );
+bool_t 	max30102_readNewValue 		( void );
+int16_t max30102_check 				( void );
+uint8_t max30102_getWritePointer 	( void );
+uint8_t max30102_getReadPointer 	( void );
 
-/* Obtener datos de leds RED e IR */
-uint32_t getRed ( void );
-uint32_t getIR ( void );
+void 	max30102_oxygenSaturation 	(uint32_t * ledIr, uint32_t * ledR, int32_t numSamples );
+void 	max30102_hearBeat 			( uint32_t dataIr );
 
 /* Funcion para enmascarar registros */
-void maskRegister ( uint8_t _register, uint8_t _mask, uint8_t bitMask );
+void 	max30102_maskRegister ( uint8_t _register, uint8_t _mask, uint8_t bitMask );
 
 #endif /* PRACTICAFINAL_PDM_PCSE_INC_SAPI_H_ */

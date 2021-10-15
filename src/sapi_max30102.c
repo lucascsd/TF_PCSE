@@ -6,171 +6,132 @@
  */
 
 #include "sapi_max30102.h"
-
 /* Variables goblaes */
 
 max30102_t _max30102;
 
+max30102_config_t _config;
+
 /* Mis funciones */
 
-/* Init Driver */
-void initStructMax30102()
-{
-
-	/* TODO: Inicializar parametros de estructura por default */
-	/* Direccopm de esclavo */
-	_max30102._address 	=	MAX_ADDRESS;
-
-	/* Single read */
-	_max30102._dataQty	=	1;
-
-	/* Average Samples */
-	_max30102._avg		=	SMP_AVE_8;
-
-	/* Clear register read */
-	for ( uint8_t index = 0; index < 192; index++)
-		_max30102.redIR[index] = 0;
-
-}
-
 /* Init board MAX30102 */
-bool_t max30102Init( )
+bool_t max30102_Init( max30102_t driver_config )
 {
 
-	/* TODO: CREAR E INICIALIZAR ESTRUCTURA DE CONTROL */
-	initStructMax30102();
+	_max30102._i2cPortFn 	= driver_config._i2cPortFn;
+	_max30102._i2cWriteFn 	= driver_config._i2cWriteFn;
+	_max30102._i2cReadFn 	= driver_config._i2cReadFn;
+	_max30102._delay		= driver_config._delay;
 
 	/* Selecciono puerto I2C e inicializo */
-	if ( !i2cInit(I2C0, MAX30102_I2C_RATE_STD) )
+	if ( !_max30102._i2cPortFn(I2C0, MAX30102_I2C_RATE_STD) )
 		return FALSE;
 
 	/* Verificar conexión de MAX30102 */
-	if ( !readPartID( ) )
+	if ( !max30102_readPartID( ) )
 		return false;
-	printf("Part ID = 0x%x \n\r", _max30102._buffer);
 
 	/* Lectura de Revision ID */
-	if ( !readRevisionID ( ) )
+	if ( !max30102_readRevisionID ( ) )
 		return false;
-	printf("Revision ID = 0x%x \n\r", _max30102._buffer);
-
-	if ( !max30102_setup ( ) )
-		return FALSE;
-
-	return true;
-}
-
-/* Obtiene puntero de escritura */
-uint8_t max30102Write ( uint8_t registerAddr, uint8_t data )
-{
-
-	uint8_t transmitDataBuffer[2];
-	transmitDataBuffer[0] = registerAddr;
-	transmitDataBuffer[1] = data;
-
-	return i2cWrite(I2C0, _max30102._address, transmitDataBuffer, 2, TRUE);
-}
-
-/* Obtiene puntero de escritura */
-bool_t max30102Read ( uint8_t registerAddr, uint8_t _dataQty )
-{
-	return i2cRead ( I2C0, _max30102._address, &registerAddr, 1, TRUE, &_max30102._buffer, _dataQty, TRUE );
-}
-
-/* Obtiene puntero de escritura */
-bool_t max30102ReadMoreSamples ( uint8_t registerAddr, uint8_t _dataQty )
-{
-	return i2cRead ( I2C0, _max30102._address, &registerAddr, 1, TRUE, _max30102.redIR, _dataQty, TRUE );
-}
-
-/* Funcion para obtener PART ID */
-bool_t readPartID ( )
-{
-	return max30102Read ( PART_ID, 1 );
-}
-
-/* Funcion para obtener REVISION ID */
-bool_t readRevisionID ( )
-{
-	return max30102Read ( REVISION_ID, 1 );
-}
-
-/* Pasar por argumento SMP_AVE_N, */
-bool_t max30102_setup (  )
-{
-	bool_t stateMax30102;
 
 	/* POR register */
-	stateMax30102 = max30102_reset();
-	if ( !stateMax30102 )
+	if ( !max30102_reset() )
 		return FALSE;
 
-	/* Sample average */
-	stateMax30102 = setSmpAvgFIFO ( SMP_AVE_8 );
-
-	if ( !stateMax30102 )
-		return FALSE;
-
-	/* Roll Over */
-	stateMax30102 = rollOver ( FIFO_ROLLOVER_EN );
-	if ( !stateMax30102 )
-		return FALSE;
-
-	/* Set LED Mode */
-	stateMax30102 = ledMode ( MODE_MULTI );
-
-	if ( !stateMax30102 )
-		return FALSE;
-
-	/* Set ADC Range Mode */
-	stateMax30102 = spo2Config ( SPO2_ADC_RGE_8192 );
-
-	if ( !stateMax30102 )
-		return FALSE;
-
-	/* Set Sample Rate Mode */
-	stateMax30102 = sampleRate ( SAMPLERATE_800 );
-
-	if ( !stateMax30102 )
-		return FALSE;
-
-	/* Set Pulse width Mode */
-	stateMax30102 = pulseWidth ( PULSEWIDTH_411 );
-
-	if ( !stateMax30102 )
-		return FALSE;
-
-	/* Set Led_1 Mode */
-	stateMax30102 = pulseAmplitude ( PULSEAMPLITUDE_06, LED_PULSE_AMP_1 );
-
-	if ( !stateMax30102 )
-		return FALSE;
-
-	/* Set Led_2 Mode */
-	stateMax30102 = pulseAmplitude ( PULSEAMPLITUDE_06, LED_PULSE_AMP_2 );
-
-	if ( !stateMax30102 )
-		return FALSE;
-
-	/* Set Led_1 Config */
-	stateMax30102 = ledConfig ( MULTILED_CONTROL_RED, LED_CTRL_REG_12, 0 );
-
-	if ( !stateMax30102 )
-		return FALSE;
-
-	/* Set Led_2 Config */
-	stateMax30102 = ledConfig ( MULTILED_CONTROL_IR, LED_CTRL_REG_12, 4 );
-
-	if ( !stateMax30102 )
-		return FALSE;
-
-	/* Reset the FIFO before we begin checking the sensor */
-	stateMax30102 = clearFIFO();
-
-	if ( !stateMax30102 )
+	/* Configuracion del device */
+	if ( !max30102_setup ( _config ) )
 		return FALSE;
 
 	return TRUE;
+}
+
+/* Funcion para obtener PART ID */
+uint8_t max30102_readPartID ( )
+{
+	uint8_t data;
+
+	if ( _max30102._i2cReadFn ( I2C0, MAX_ADDRESS, PART_ID, &data, 1 ) )
+		return data;
+	else
+		return 0;
+}
+
+/* Funcion para obtener REVISION ID */
+uint8_t max30102_readRevisionID ( )
+{
+	uint8_t data;
+
+	if ( _max30102._i2cReadFn ( I2C0, MAX_ADDRESS, REVISION_ID, &data, 1 ) )
+		return data;
+	else
+		return 0;
+}
+
+/* Configuracion del device */
+bool_t max30102_setup ( max30102_config_t _configDevice )
+{
+	/* Sample average */
+	if ( !max30102_config ( FIFO_CONFIG, SMP_AVE_8, 0 ) )
+		return FALSE;
+
+	/* Roll Over */
+	if ( !max30102_config ( FIFO_CONFIG, FIFO_ROLLOVER_EN, 0 ) )
+		return FALSE;
+
+	/* Set LED Mode */
+	if ( !max30102_config ( MODE_CONFIG, MODE_MULTI, 0 ) )
+		return FALSE;
+
+	/* Set ADC Range Mode */
+	if ( !max30102_config ( SPO2_CONFIG, SPO2_ADC_RGE_4096, 0 ) )
+		return FALSE;
+
+	/* Set Sample Rate Mode */
+	if ( !max30102_config ( SPO2_CONFIG, SAMPLERATE_400, 0 ) )
+		return FALSE;
+
+	/* Set Pulse width Mode */
+	if ( !max30102_config ( SPO2_CONFIG, PULSEWIDTH_411, 0 ) )
+		return FALSE;
+
+	/* Set Led_1 Mode */
+	if ( !max30102_config ( LED_PULSE_AMP_1, PULSEAMPLITUDE_06, 0 ) )
+		return FALSE;
+
+	/* Set Led_2 Mode */
+	if ( !max30102_config ( LED_PULSE_AMP_2, PULSEAMPLITUDE_06, 0 ) )
+		return FALSE;
+
+	/* Set Led_1 Config */
+	if ( !max30102_config ( LED_CTRL_REG_12, MULTILED_CONTROL_RED, 0 ) )
+		return FALSE;
+
+	/* Set Led_2 Config */
+	if ( !max30102_config ( LED_CTRL_REG_12, MULTILED_CONTROL_IR, 4 ) )
+		return FALSE;
+
+	/* Reset the FIFO before we begin checking the sensor */
+	if ( !max30102_clearFIFO() )
+		return FALSE;
+
+	return TRUE;
+}
+
+bool_t max30102_config ( uint8_t _register, uint8_t _param, uint8_t shitf )
+{
+	uint8_t datoActual;
+
+	 _max30102._i2cReadFn ( I2C0, MAX_ADDRESS, _register, &_config._buffer, 1 );
+	 datoActual = _config._buffer;
+
+	/* Enable roll over if FIFO over flows */
+	max30102_maskRegister ( _register, ~_param, _param << shitf );
+
+	if ( _config._buffer == datoActual | _param )
+		return TRUE;
+	else
+		return FALSE;
 
 }
 
@@ -178,196 +139,33 @@ bool_t max30102_setup (  )
 bool_t max30102_reset ()
 {
 
-	maskRegister ( MODE_CONFIG, ~MODE_RESET, MODE_RESET );
+	max30102_maskRegister ( MODE_CONFIG, ~MODE_RESET, MODE_RESET );
 
-	if ( (_max30102._buffer & MODE_RESET) == 0 )
+	if ( (_config._buffer & MODE_RESET) == 0 )
 		return TRUE;
 	else
 		return FALSE;
 
 }
 
-bool_t setSmpAvgFIFO ( avgsamples_t avgsamples )
+bool_t max30102_clearFIFO ( )
 {
 
-	maskRegister ( FIFO_CONFIG, SMP_AVE_MASK, avgsamples );
-
-	if ( _max30102._buffer == avgsamples )
-		return TRUE;
-	else
+	if ( !_max30102._i2cWriteFn ( I2C0, MAX_ADDRESS, FIFO_WRITE_POINTER, 0x00 ) )
 		return FALSE;
-
-}
-
-bool_t rollOver ( rollOver_t _rollOver )
-{
-
-	uint8_t dataActual;
-
-	max30102Read ( FIFO_CONFIG, 1 );
-
-	dataActual =  _max30102._buffer;
-	/* Enable roll over if FIFO over flows */
-	maskRegister ( FIFO_CONFIG, ~_rollOver, _rollOver );
-
-	if ( _max30102._buffer == dataActual | _rollOver )
-		return TRUE;
-	else
+	if ( !_max30102._i2cWriteFn ( I2C0, MAX_ADDRESS, OVERFLOW_COUNTER, 0x00 ) )
 		return FALSE;
-
-}
-
-bool_t ledMode ( ledMode_t _ledMode )
-{
-
-	uint8_t ledActual;
-
-	max30102Read ( MODE_CONFIG, 1 );
-
-	ledActual =  _max30102._buffer;
-
-	/* Enable roll over if FIFO over flows */
-	maskRegister ( MODE_CONFIG, ~_ledMode, _ledMode );
-
-	if ( _max30102._buffer == ledActual | _ledMode )
-		return TRUE;
-	else
-		return FALSE;
-
-}
-
-bool_t spo2Config ( spo2Mode_t _spo2Mode )
-{
-
-	uint8_t spo2Actual;
-
-	max30102Read ( SPO2_CONFIG, 1 );
-
-	spo2Actual =  _max30102._buffer;
-
-	/* Enable roll over if FIFO over flows */
-	maskRegister ( SPO2_CONFIG, ~_spo2Mode, _spo2Mode );
-
-	if ( _max30102._buffer == spo2Actual | _spo2Mode )
-		return TRUE;
-	else
-		return FALSE;
-
-}
-
-bool_t sampleRate ( srMode_t _srMode )
-{
-
-	uint8_t srActual;
-
-	max30102Read ( SPO2_CONFIG, 1 );
-
-	srActual =  _max30102._buffer;
-
-	/* Enable roll over if FIFO over flows */
-	maskRegister ( SPO2_CONFIG, ~_srMode, _srMode );
-
-	if ( _max30102._buffer == srActual | _srMode )
-		return TRUE;
-	else
-		return FALSE;
-
-}
-
-bool_t pulseWidth ( pwMode_t _pwMode )
-{
-
-	uint8_t srActual;
-
-	max30102Read ( SPO2_CONFIG, 1 );
-
-	srActual =  _max30102._buffer;
-
-	/* Enable roll over if FIFO over flows */
-	maskRegister ( SPO2_CONFIG, ~_pwMode, _pwMode );
-
-	if ( _max30102._buffer == srActual | _pwMode )
-		return TRUE;
-	else
-		return FALSE;
-
-}
-
-bool_t pulseAmplitude ( ledMode_t _ledMode, registerLed_t _registerLed )
-{
-
-	uint8_t ledActual;
-
-	max30102Read ( _registerLed, 1 );
-
-	ledActual =  _max30102._buffer;
-
-	/* Enable roll over if FIFO over flows */
-	maskRegister ( _registerLed, ~_ledMode, _ledMode );
-
-	if ( _max30102._buffer == ledActual | _ledMode )
-		return TRUE;
-	else
-		return FALSE;
-
-}
-
-bool_t ledConfig ( ledMode_t _ledMode, registerLed_t _registerLed, uint8_t shitf )
-{
-
-	uint8_t ledActual;
-
-	max30102Read ( _registerLed, 1 );
-
-	ledActual =  _max30102._buffer;
-
-	/* Enable roll over if FIFO over flows */
-	maskRegister ( _registerLed, ~_ledMode, _ledMode << shitf );
-
-	if ( _max30102._buffer == ledActual | _ledMode )
-		return TRUE;
-	else
-		return FALSE;
-
-}
-
-bool_t clearFIFO ( )
-{
-	if ( !max30102Write ( FIFO_WRITE_POINTER, 0x00 ) )
-		return FALSE;
-	if ( !max30102Write ( OVERFLOW_COUNTER, 0x00 ) )
-		return FALSE;
-	if ( !max30102Write ( FIFO_READ_POINTER, 0x00 ) )
+	if ( !_max30102._i2cWriteFn ( I2C0, MAX_ADDRESS, FIFO_READ_POINTER, 0x00 ) )
 		return FALSE;
 
 	return TRUE;
 }
 
-/* Report the most recent red value */
-uint32_t getRed ( void )
+bool_t max30102_readNewValue ( )
 {
-	/* Check the sensor for new data for 250ms */
-	if( readNewValue() )
-		return _max30102.red[_max30102.head];
-	else
-		return 0 ; /* Sensor failed to find new data */
-}
+	uint16_t numberOfSamples = max30102_check();
 
-/* Report the most recent IR value */
-uint32_t getIR ( void )
-{
-	/* Check the sensor for new data for 250ms */
-	if( readNewValue() )
-		return _max30102.IR[_max30102.head];
-	else
-		return 0 ; /* Sensor failed to find new data */
-}
-
-bool_t readNewValue ( )
-{
-	uint16_t numberOfSamples = check();
-
-	if ( !numberOfSamples ) /* We found new data! */
+	if ( !numberOfSamples )
 		return FALSE;
 
 	return TRUE;
@@ -375,81 +173,128 @@ bool_t readNewValue ( )
 }
 
 /* Read the FIFO Write Pointer */
-uint8_t getWritePointer ( )
+uint8_t max30102_getWritePointer ( )
 {
-	if ( max30102Read ( FIFO_WRITE_POINTER, 1 ) )
-		return _max30102._buffer;
+	uint8_t datoActual;
+
+	if ( _max30102._i2cReadFn ( I2C0, MAX_ADDRESS, FIFO_WRITE_POINTER, &datoActual, 1 ))
+		return datoActual;
 
 	return 0;
 }
 
 /* Read the FIFO Read Pointer */
-uint8_t getReadPointer ( )
+uint8_t max30102_getReadPointer ( )
 {
-	if ( max30102Read ( FIFO_READ_POINTER, 1 ) )
-		return _max30102._buffer;
+	uint8_t datoActual;
+
+	if ( _max30102._i2cReadFn ( I2C0, MAX_ADDRESS, FIFO_READ_POINTER, &datoActual, 1 ))
+		return datoActual;
 
 	return 0;
 }
 
-int16_t check ( )
+int16_t max30102_check ( )
 {
 
-	uint8_t readPointer = getReadPointer();
-	uint8_t writePointer = getWritePointer();
-	int8_t numberSamples = 0;
+	uint8_t readPointer = max30102_getReadPointer();
+	uint8_t writePointer = max30102_getWritePointer();
 
-	/* Do we have new data? */
+	uint8_t datoLeidoAux[6];
+	uint8_t indexR = 0, indexIR = 0;
+
 	if (readPointer != writePointer)
 	{
-		/* Calculate the number of readings we need to get from sensor */
-		numberSamples = writePointer - readPointer;
 
-		if (numberSamples < 0) numberSamples += 32; /* Wrap condition */
+		_config.numberSamplesAvailable = writePointer - readPointer;
+		if (_config.numberSamplesAvailable < 0) _config.numberSamplesAvailable += 32;
 
-		uint32_t datoLeido[numberSamples];
-
-		uint8_t bytesLeftToRead = numberSamples * 2 * 3;
-
-		while (bytesLeftToRead > 0)
+		for (uint8_t index = 0; index < _config.numberSamplesAvailable; index++)
 		{
-			int8_t samplesToRead = bytesLeftToRead;
 
-			if (samplesToRead > MAX30102_BUFFER_LENGTH)
-				samplesToRead = MAX30102_BUFFER_LENGTH - (MAX30102_BUFFER_LENGTH % (2 * 3));
+			_max30102._i2cReadFn ( I2C0, MAX_ADDRESS, FIFO_DATA_REGISTER, datoLeidoAux, 6 );
 
-			bytesLeftToRead = bytesLeftToRead - samplesToRead;
+			_config.datoLeidoRed[indexR] = ((uint32_t)datoLeidoAux[0] << 16) | ((uint32_t)datoLeidoAux[1] << 8) | (uint32_t)datoLeidoAux[2];
+			_config.datoLeidoRed[indexR] = 0x3FFFF & _config.datoLeidoRed[indexR];
+			indexR++;
 
-			max30102ReadMoreSamples ( FIFO_DATA_REGISTER, bytesLeftToRead );
-			uint8_t index;
+			_config.datoLeidoIr[indexIR] = ((uint32_t)datoLeidoAux[3] << 16) | ((uint32_t)datoLeidoAux[4] << 8) | ((uint32_t)datoLeidoAux[5]);
+			_config.datoLeidoIr[indexIR] = 0x3FFFF & _config.datoLeidoIr[indexIR];
+			indexIR++;
 
-			for (uint8_t i = 0; i < numberSamples; i++)
-			{
-				index = i * 3;
-				datoLeido[i] = (_max30102.redIR[index] << 16) | (_max30102.redIR[index+1] << 8) | _max30102.redIR[index+2];
-				datoLeido[i] = datoLeido[i] & 0x3FFFF;
-				//printf("Dato %d leido = %d \n\r", i, datoLeido[i]);
-			}
+			max30102_hearBeat ( _config.datoLeidoIr[indexIR] );
 
-		} //FIN while (bytesLeftToRead > 0)
+		}
+
+		if  ( _config.numberSamplesAvailable > 10 )
+			max30102_oxygenSaturation ( _config.datoLeidoIr, _config.datoLeidoRed, _config.numberSamplesAvailable );
 
 	} //FIN readPtr != writePtr
 
-	return numberSamples; //Let the world know how much new data we found
+	return _config.numberSamplesAvailable;
 }
 
-void maskRegister ( uint8_t _register, uint8_t _mask, uint8_t bitConfig )
+
+void max30102_oxygenSaturation (uint32_t * ledIr, uint32_t * ledR, int32_t numSamples )
+{
+	float_t spo2 = 0;
+	float_t avgRed = 0, avgIr = 0;
+	float_t rmsRed = 0, rmsIr = 0;
+	float_t R;
+
+	for (uint16_t indexSPO2 = 0; indexSPO2 < numSamples; indexSPO2++)
+	{
+
+		avgRed = avgRed + ledR[indexSPO2] ;
+		avgIr = avgIr + ledIr[indexSPO2] ;
+
+		rmsRed = rmsRed + ( ( ledR[indexSPO2] ) * ( ledR[indexSPO2] ) );
+		rmsIr = rmsIr + ( ( ledIr[indexSPO2]) * ( ledIr[indexSPO2]) );
+
+	}
+
+	/* means */
+	avgRed = avgRed / numSamples;
+	avgIr = avgIr / numSamples;
+
+	/* RMS */
+	rmsRed = rmsRed / numSamples;
+	rmsIr = rmsIr / numSamples;
+
+	R = ( sqrt( rmsRed ) / avgRed ) / ( sqrt( rmsIr ) / avgIr );
+	spo2 = 110 - 25*R;
+
+	printf("Valor de saturacion de oxigeno  = %1.2f \n\r", spo2 );
+
+}
+
+
+void max30102_hearBeat ( uint32_t dataIr )
+{
+
+	if ( dataIr > 100000 )
+		countBeat++;
+	if ( delayRead( &beatTime ) )
+	{
+
+		BPM = countBeat * 6; // Para 10 seg
+		printf("Cantidad de pulsos por minutro  = %d \n\r", countBeat );
+		countBeat = 0;
+
+	}
+}
+
+void max30102_maskRegister ( uint8_t _register, uint8_t _mask, uint8_t bitConfig )
 {
 
 	uint8_t registerActual = 0;
 
-	if ( max30102Read ( _register, 1 ) )
-		registerActual = _max30102._buffer;
+	_max30102._i2cReadFn ( I2C0, MAX_ADDRESS, _register, &registerActual, 1 );
 
 	/* Enmascaro los bits del registro */
 	registerActual = registerActual & _mask;
 
 	/* Escribo el registro con las máscara más el bit o bits a cambiar */
-	max30102Write ( _register, registerActual | bitConfig );
+	_max30102._i2cWriteFn ( I2C0, MAX_ADDRESS, _register, registerActual | bitConfig );
 
 }
