@@ -27,7 +27,8 @@ int main( void )
 {
 
 	max30102_t driver_max30102;
-
+	float_t spo2Data;
+	uint32_t BPM;
 	/* ------------- INICIALIZACIONES ------------- */
 	boardConfig();
 
@@ -38,7 +39,7 @@ int main( void )
 	driver_max30102._delay		= delay_CIAA_port;
 
 	delayInit( &beatTime, RET_BPM );
-
+	printf("\e[1;1H\e[2J");
 	// Inicializar la IMU
 	printf("Inicializando MAX30102...\r\n" );
 	bool_t status;
@@ -59,9 +60,14 @@ int main( void )
 	// ----- Repeat for ever -------------------------
 	while( true ) {
 		/* Lectura de los leds IR y RED del modulo */
-		delay(1000);
-		max30102_readNewValue();
+
+//		delay ( 1000 );
+//		spo2Data = max30102_readNewValue();
+//		printf("\033[A\33[2KT\rSaturacion de oxigeno en sangre SPO2 = %1.2f\r\n", spo2Data );
+
+		BPM = max30102_hearBeat();
 		max30102_clearFIFO();
+		printf("\033[A\33[2KT\rBPM = %d\r\n", BPM );
 	}
 
 	// YOU NEVER REACH HERE, because this program runs directly or on a

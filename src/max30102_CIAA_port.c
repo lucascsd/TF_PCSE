@@ -57,7 +57,8 @@ bool_t max30102Read_CIAA_port ( i2cMap_t  i2cNumber, uint8_t  i2cSlaveAddress, u
 				La cantidad de milisegundos del delay.
 */
 /**************************************************************************/
-void delay_CIAA_port(uint32_t millisecs)
+uint32_t delay_CIAA_port(void)
 {
-	delay((tick_t)millisecs);
+	tick_t number_of_ticks = tickRead();
+	return (uint32_t)number_of_ticks;
 }

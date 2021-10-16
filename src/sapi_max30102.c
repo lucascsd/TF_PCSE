@@ -84,11 +84,11 @@ bool_t max30102_setup ( max30102_config_t _configDevice )
 		return FALSE;
 
 	/* Set ADC Range Mode */
-	if ( !max30102_config ( SPO2_CONFIG, SPO2_ADC_RGE_4096, 0 ) )
+	if ( !max30102_config ( SPO2_CONFIG, SPO2_ADC_RGE_2048, 0 ) )
 		return FALSE;
 
 	/* Set Sample Rate Mode */
-	if ( !max30102_config ( SPO2_CONFIG, SAMPLERATE_400, 0 ) )
+	if ( !max30102_config ( SPO2_CONFIG, SAMPLERATE_1000, 0 ) )
 		return FALSE;
 
 	/* Set Pulse width Mode */
@@ -96,11 +96,11 @@ bool_t max30102_setup ( max30102_config_t _configDevice )
 		return FALSE;
 
 	/* Set Led_1 Mode */
-	if ( !max30102_config ( LED_PULSE_AMP_1, PULSEAMPLITUDE_06, 0 ) )
+	if ( !max30102_config ( LED_PULSE_AMP_1, PULSEAMPLITUDE_12, 0 ) )
 		return FALSE;
 
 	/* Set Led_2 Mode */
-	if ( !max30102_config ( LED_PULSE_AMP_2, PULSEAMPLITUDE_06, 0 ) )
+	if ( !max30102_config ( LED_PULSE_AMP_2, PULSEAMPLITUDE_12, 0 ) )
 		return FALSE;
 
 	/* Set Led_1 Config */
@@ -161,14 +161,9 @@ bool_t max30102_clearFIFO ( )
 	return TRUE;
 }
 
-bool_t max30102_readNewValue ( )
+float_t max30102_readNewValue ( )
 {
-	uint16_t numberOfSamples = max30102_check();
-
-	if ( !numberOfSamples )
-		return FALSE;
-
-	return TRUE;
+	return max30102_check();
 
 }
 
@@ -199,6 +194,7 @@ int16_t max30102_check ( )
 
 	uint8_t readPointer = max30102_getReadPointer();
 	uint8_t writePointer = max30102_getWritePointer();
+	float_t	spo2;
 
 	uint8_t datoLeidoAux[6];
 	uint8_t indexR = 0, indexIR = 0;
@@ -222,20 +218,17 @@ int16_t max30102_check ( )
 			_config.datoLeidoIr[indexIR] = 0x3FFFF & _config.datoLeidoIr[indexIR];
 			indexIR++;
 
-			max30102_hearBeat ( _config.datoLeidoIr[indexIR] );
-
 		}
 
-		if  ( _config.numberSamplesAvailable > 10 )
-			max30102_oxygenSaturation ( _config.datoLeidoIr, _config.datoLeidoRed, _config.numberSamplesAvailable );
+		spo2 = max30102_oxygenSaturation ( _config.datoLeidoIr, _config.datoLeidoRed, _config.numberSamplesAvailable );
 
 	} //FIN readPtr != writePtr
-
-	return _config.numberSamplesAvailable;
+	max30102_clearFIFO();
+	return spo2;
 }
 
 
-void max30102_oxygenSaturation (uint32_t * ledIr, uint32_t * ledR, int32_t numSamples )
+float_t max30102_oxygenSaturation (uint32_t * ledIr, uint32_t * ledR, int32_t numSamples )
 {
 	float_t spo2 = 0;
 	float_t avgRed = 0, avgIr = 0;
@@ -262,26 +255,42 @@ void max30102_oxygenSaturation (uint32_t * ledIr, uint32_t * ledR, int32_t numSa
 	rmsIr = rmsIr / numSamples;
 
 	R = ( sqrt( rmsRed ) / avgRed ) / ( sqrt( rmsIr ) / avgIr );
-	spo2 = 110 - 25*R;
 
-	printf("Valor de saturacion de oxigeno  = %1.2f \n\r", spo2 );
+	spo2 = 110 - 17*R;
 
+	if ( spo2 >= 100 ) spo2 = 100;
+
+	return spo2;
 }
 
-
-void max30102_hearBeat ( uint32_t dataIr )
+uint32_t max30102_hearBeat ( )
 {
+	uint32_t datoHeartBeat, counter = 0 ;
+	uint32_t 	BPM = 0;
+	uint8_t datoLeidoAux[6];
 
-	if ( dataIr > 100000 )
-		countBeat++;
-	if ( delayRead( &beatTime ) )
+	while ( !delayRead( &beatTime ) )
 	{
+		_max30102._i2cReadFn ( I2C0, MAX_ADDRESS, FIFO_DATA_REGISTER, datoLeidoAux, 6 );
 
-		BPM = countBeat * 6; // Para 10 seg
-		printf("Cantidad de pulsos por minutro  = %d \n\r", countBeat );
-		countBeat = 0;
+		datoHeartBeat = ((uint32_t)datoLeidoAux[0] << 16) | ((uint32_t)datoLeidoAux[1] << 8) | (uint32_t)datoLeidoAux[2];
+		datoHeartBeat = 0x3FFFF & datoHeartBeat;
+
+		if ( 115000 < datoHeartBeat )
+		{
+			//delay(1);
+			counter++;
+		}
 
 	}
+	if ( counter > 100 && counter < 1500 )
+	{
+		BPM = counter * 12 / 100;
+	}else{
+		BPM = 0;
+	}
+
+	return BPM;
 }
 
 void max30102_maskRegister ( uint8_t _register, uint8_t _mask, uint8_t bitConfig )

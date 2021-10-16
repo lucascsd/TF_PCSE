@@ -137,7 +137,7 @@ typedef uint8_t registerLed_t;
 typedef bool_t (*i2c_port_t)(i2cMap_t, uint32_t);
 typedef bool_t (*i2c_write_t)( i2cMap_t  i2cNumber, uint8_t  i2cSlaveAddress, uint8_t registerAddr, uint8_t data );
 typedef bool_t (*i2c_Read_t)( i2cMap_t  i2cNumber, uint8_t  i2cSlaveAddress, uint8_t registerAddr, uint8_t* receiveDataBuffer, uint16_t receiveDataBufferSize );
-typedef void (*delayFnc_t)(uint32_t);
+typedef uint32_t (*readTimeFnc_t)(void);
 
 typedef struct
 {
@@ -145,10 +145,9 @@ typedef struct
 	i2c_port_t		_i2cPortFn;
 	i2c_write_t		_i2cWriteFn;
 	i2c_Read_t		_i2cReadFn;
-	delayFnc_t		_delay;
+	readTimeFnc_t		_delay;
 
 } max30102_t;
-
 
 typedef struct{
 	/* Tipos de datos para configuracion */
@@ -170,8 +169,7 @@ typedef struct{
 
 /* Variables del tipo tick para retardos */
 delay_t 	beatTime;
-uint16_t 	countBeat;
-float_t 	BPM;
+
 
 /* Mis funciones */
 void 	initStructMax30102( void );
@@ -187,13 +185,13 @@ uint8_t max30102_readPartID 		( void );
 uint8_t max30102_readRevisionID 	( void );
 
 bool_t 	max30102_clearFIFO 			( void );
-bool_t 	max30102_readNewValue 		( void );
+float_t max30102_readNewValue 		( void );
 int16_t max30102_check 				( void );
 uint8_t max30102_getWritePointer 	( void );
 uint8_t max30102_getReadPointer 	( void );
 
-void 	max30102_oxygenSaturation 	(uint32_t * ledIr, uint32_t * ledR, int32_t numSamples );
-void 	max30102_hearBeat 			( uint32_t dataIr );
+float_t max30102_oxygenSaturation	(uint32_t * ledIr, uint32_t * ledR, int32_t numSamples );
+uint32_t max30102_hearBeat 			( void );
 
 /* Funcion para enmascarar registros */
 void 	max30102_maskRegister ( uint8_t _register, uint8_t _mask, uint8_t bitMask );

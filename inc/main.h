@@ -14,7 +14,7 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#define RET_BPM		10000
+#define RET_BPM		500
 /*=====[Avoid multiple inclusion - end]======================================*/
 
 #endif /* __PCSE_H__ */
